@@ -15,7 +15,7 @@ const alias = Ember.computed.alias;
 const service = Ember.inject.service;
 const observer = Ember.observer;
 const hash = Ember.RSVP.hash;
-const fetch = Ember.inject.service;
+const rethrow = Ember.RSVP.rethrow;
 const on = Ember.on;
 const setProperties = Ember.setProperties;
 const isEmpty = Ember.isEmpty;
@@ -25,13 +25,14 @@ const defaultBase = 1024;
 /*!!!!!!!!!!!GLOBAL CONST END!!!!!!!!!!!*/
 
 
-const OS_WHITELIST = ['centos_7', 'coreos_stable', 'ubuntu_14_04', 'ubuntu_16_04', 'ubuntu_18_04', 'rancher'];
-const PLAN_BLACKLIST = ['baremetal_2a']; // quick wheres james spader?
+const OS_WHITELIST = ['centos_7', 'coreos_stable', 'ubuntu_14_04', 'ubuntu_16_04', 'ubuntu_18_04', 'ubuntu_20_04', 'ubuntu_21_04', 'rancher'];
+const PLAN_BLACKLIST = ['baremetal_2a'];
 const DEFAULTS = {
-  os: 'ubuntu_16_04',
+  os: 'ubuntu_20_04',
+  plan: 'c3.small.x86',
   billingCycle: 'hourly',
+  metro: 'da',
 }
-const defaultFacility = "ewr1";
 
 /*!!!!!!!!!!!DO NOT CHANGE START!!!!!!!!!!!*/
 export default Ember.Component.extend(NodeDriver, {
@@ -39,8 +40,8 @@ export default Ember.Component.extend(NodeDriver, {
   step: 1,
   config: alias('model.%%DRIVERNAME%%Config'),
   app: service(),
-  intl: service(),
   fetch: service(),
+  intl: service(),
   init() {
     // This does on the fly template compiling, if you mess with this :cry:
     const decodedLayout = window.atob(LAYOUT);
@@ -133,7 +134,7 @@ export default Ember.Component.extend(NodeDriver, {
       let promises = {
         plans: this.apiRequest('plans'),
         opSys: this.apiRequest('operating-systems'),
-        facilities: this.apiRequest('facilities'),
+        metros: this.apiRequest('locations/metros?includes=available_in_metros'),
       };
 
       let instanceType = get(this, 'config.hwReservationId')
@@ -143,24 +144,24 @@ export default Ember.Component.extend(NodeDriver, {
         set(this, 'config.deviceType', 'reserved')
       }
 
-      hash(promises).then((hash) => {
+      hash(promises).catch(rethrow).then((hash) => {
         let osChoices = this.parseOSs(hash.opSys.operating_systems);
-        let selectedPlans = this.parsePlans(osChoices.findBy('slug', 'ubuntu_16_04'), hash.plans.plans);
+        let selectedPlans = this.parsePlans(osChoices.findBy('slug', DEFAULTS.os), hash.plans.plans);
 
         setProperties(this, {
           allOS: osChoices,
           allPlans: hash.plans.plans,
           step: 2,
-          facilityChoices: hash.facilities.facilities,
+          metroChoices: hash.metros.metros,
           osChoices,
           planChoices: selectedPlans,
           deviceType: [{ name: "On Demand", value: "on-demand" }, { name: "Reserved", value: "reserved" }]
         });
 
         setProperties(config, DEFAULTS);
-        let facilityCode = get(this, 'config.facilityCode');
-        if (!facilityCode) {
-          set(this, 'config.facilityCode', defaultFacility)
+        let metroCode = get(this, 'config.metroCode');
+        if (!metroCode) {
+          set(this, 'config.metroCode', DEFAULTS.metro)
         }
         savedCB(true);
       }, (err) => {
@@ -188,7 +189,7 @@ export default Ember.Component.extend(NodeDriver, {
 
     },
   },
-  facilityChoices: [],
+  metroChoices: [],
   planChoices: [],
   osChoices: [],
   allOS: [],
@@ -227,6 +228,8 @@ export default Ember.Component.extend(NodeDriver, {
       } else {
         return out;
       }
+    }).catch((err) => {
+      return reject(err);
     });
   },
 
@@ -236,7 +239,7 @@ export default Ember.Component.extend(NodeDriver, {
       deviceType: 'reserved',
       hwReservationId: 'next-available',
     })
-    this.notifyPropertyChange('config.facilityCode');
+    this.notifyPropertyChange('config.metroCode');
   },
 
   getOnDemandPlans() {
@@ -246,7 +249,7 @@ export default Ember.Component.extend(NodeDriver, {
       hwReservationId: '',
     })
     console.log(config.hwReservationId)
-    this.notifyPropertyChange('config.facilityCode');
+    this.notifyPropertyChange('config.metroCode');
   },
 
   parseOSs(osList) {
@@ -278,22 +281,20 @@ export default Ember.Component.extend(NodeDriver, {
   }),
 
   osObserver: on('init', observer('config.os', function () {
-    this.notifyPropertyChange('config.facility');
+    this.notifyPropertyChange('config.metro');
   })),
 
-  facilityObserver: on('init', observer('config.facilityCode', function () {
-    let facilities = get(this, 'facilityChoices');
-    let slug = get(this, 'config.facilityCode');
-    let facility = facilities.findBy('code', slug);
-    set(this, 'config.facilityCode', slug)
+  metroObserver: on('init', observer('config.metroCode', function () {
+    let metros = get(this, 'metroChoices');
+    let slug = get(this, 'config.metroCode');
+    let metro = metros.findBy('code', slug);
+    set(this, 'config.metroCode', slug)
     let out = [];
     let allPlans = get(this, 'allPlans');
-    if (allPlans && facility) {
+    if (allPlans && metro) {
       allPlans.forEach((plan) => {
-        plan.available_in.forEach((fac) => {
-          let facId = fac.href.split('/')[fac.href.split('/').length - 1];
-
-          if (facility.id === facId) {
+        plan.available_in_metros.forEach((m) => {
+          if (metro.code === m.code) {
             out.push(plan);
           }
         })
@@ -308,9 +309,9 @@ export default Ember.Component.extend(NodeDriver, {
       else if (filteredByOs.length == 0) {
         set(this, 'config.plan', "")
       }
-      //always set to baremetal_0 when available
+      //always set to default when available
       for (var i = 0; i < filteredByOs.length; i++) {
-        if (filteredByOs[i].slug == 'baremetal_0') {
+        if (filteredByOs[i].slug == DEFAULTS.plan) {
           set(this, 'config.plan', filteredByOs[i].slug)
           break;
         }

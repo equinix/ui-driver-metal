@@ -64,9 +64,9 @@
         </label>
       </div>
       <div class="col span-10">
-        <select class="form-control" onchange={{action (mut config.facilityCode) value="target.value"}}>
-          {{#each facilityChoices as |choice|}}
-          <option value={{choice.code}} selected={{eq config.facilityCode choice.code}}>
+        <select class="form-control" onchange={{action (mut config.metroCode) value="target.value"}}>
+          {{#each metroChoices as |choice|}}
+          <option value={{choice.code}} selected={{eq config.metroCode choice.code}}>
             {{choice.name}}
           </option>
           {{/each}}

@@ -1,7 +1,7 @@
 {
   "name": "ui-driver-metal",
   "version": "2.0.0",
-  "description": "Skeleton Rancher UI driver for metal docker-machine drivers",
+  "description": "Rancher UI driver for Equinix Metal docker-machine drivers",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/equinix/ui-driver-metal.git"

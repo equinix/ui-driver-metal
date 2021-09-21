@@ -4,7 +4,7 @@
   "description": "Skeleton Rancher UI driver for metal docker-machine drivers",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rancher/ui-driver-packet.git"
+    "url": "git+https://github.com/equinix/ui-driver-metal.git"
   },
   "author": "Rancher Labs, Inc.",
   "license": "Apache-2.0",
@@ -16,7 +16,7 @@
     "clean": "./node_modules/.bin/gulp clean",
     "build": "./node_modules/.bin/gulp build"
   },
-  "homepage": "https://github.com/rancher/ui-driver-packet#readme",
+  "homepage": "https://github.com/equinix/ui-driver-metal#readme",
   "devDependencies": {
     "@babel/core": "^7.2.2",
     "@babel/preset-env": "^7.2.3",

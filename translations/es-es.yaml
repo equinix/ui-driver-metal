@@ -56,9 +56,9 @@ nodeDriver:
   metal:
     accountSection: Acceso a la Cuenta
     projectId:
-      placeholder: Tu ID de proyecto de Packet
+      placeholder: Tu ID de proyecto de Equinix Metal
     apiKey:
-      placeholder: Tu llave de API de Packet
+      placeholder: Tu llave de API de Equinix Metal
     instanceSection: Instancia
     instanceOptionsSection: Opciones de la Instancia
     loginAction: "Siguiente: Autenticar & seleccionar red"

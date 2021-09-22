@@ -15,6 +15,9 @@ const alias = Ember.computed.alias;
 const service = Ember.inject.service;
 const observer = Ember.observer;
 const hash = Ember.RSVP.hash;
+const resolve = Ember.RSVP.resolve;
+const reject = Ember.RSVP.reject;
+const filter = Ember.RSVP.filter;
 const rethrow = Ember.RSVP.rethrow;
 const on = Ember.on;
 const setProperties = Ember.setProperties;
@@ -25,8 +28,9 @@ const defaultBase = 1024;
 /*!!!!!!!!!!!GLOBAL CONST END!!!!!!!!!!!*/
 
 
-const OS_WHITELIST = ['centos_7', 'coreos_stable', 'ubuntu_14_04', 'ubuntu_16_04', 'ubuntu_18_04', 'ubuntu_20_04', 'ubuntu_21_04', 'rancher'];
-const PLAN_BLACKLIST = ['baremetal_2a'];
+const METAL_API  = 'api.equinix.com/metal/v1';
+const OS_VERIFIED = ['centos_7', 'coreos_stable', 'ubuntu_14_04', 'ubuntu_16_04', 'ubuntu_18_04', 'ubuntu_20_04', 'ubuntu_21_04', 'rancher'];
+const PLAN_EXCLUDE = ['baremetal_2a'];
 const DEFAULTS = {
   os: 'ubuntu_20_04',
   plan: 'c3.small.x86',
@@ -144,15 +148,15 @@ export default Ember.Component.extend(NodeDriver, {
         set(this, 'config.deviceType', 'reserved')
       }
 
-      hash(promises).catch(rethrow).then((hash) => {
-        let osChoices = this.parseOSs(hash.opSys.operating_systems);
-        let selectedPlans = this.parsePlans(osChoices.findBy('slug', DEFAULTS.os), hash.plans.plans);
+      hash(promises).then((hash) => {
+        let osChoices = this.filterOSList(hash.opSys);
+        let selectedPlans = this.parsePlans(filter(osChoices,(os)=>{return os.slug == DEFAULTS.os}), hash.plans);
 
         setProperties(this, {
           allOS: osChoices,
-          allPlans: hash.plans.plans,
+          allPlans: hash.plans,
           step: 2,
-          metroChoices: hash.metros.metros,
+          metroChoices: hash.metros,
           osChoices,
           planChoices: selectedPlans,
           deviceType: [{ name: "On Demand", value: "on-demand" }, { name: "Reserved", value: "reserved" }]
@@ -193,44 +197,33 @@ export default Ember.Component.extend(NodeDriver, {
   planChoices: [],
   osChoices: [],
   allOS: [],
-  apiRequest(command, opt, out) {
-    opt = opt || {};
-
+  apiRequest(command, opt = {}, out= []) {
     let url = `${get(this, 'app.proxyEndpoint')}/`;
 
     if (opt.url) {
       url += opt.url.replace(/^http[s]?\/\//, '');
     } else {
-      url += `${'api.equinix.com/metal/v1'}/${command}`;
+      url += `${METAL_API}/${command}`;
     }
-
-    return fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'X-Auth-Token': get(this, 'config.apiKey'),
-      },
-    }).then((res) => {
+    let datakey = `${opt.data}`
+    if (!datakey) {
+      datakey = url.split("/").slice(-1)[0].split("?")[0].replace('-','_')
+    }
+    let token = get(this, 'config.apiKey')
+    let headers = {
+      'Accept': 'application/json',
+      'X-Auth-Token': token,
+    }
+    return fetch(url, { headers }).then((res) => {
       let body = res.body;
-
-      if (out) {
-        out[command].pushObjects(body[command]);
-      } else {
-        out = body;
-      }
-
-      // De-paging
+      console.log("we got body", body)
+      out = out.concat(body[datakey])
       if (body && body.links && body.links.pages && body.links.pages.next) {
-        opt.url = body.links.pages.next;
-
-        return this.apiRequest(command, opt, out).then(() => {
-          return out;
-        });
+        this.apiRequest(command, {...opt, url: body.links.pages.next }, out).then(resolve).catch(reject)
       } else {
-        return out;
+        resolve(out);
       }
-    }).catch((err) => {
-      return reject(err);
-    });
+    }).catch(reject);
   },
 
   getReserverdHardwarePlans() {
@@ -252,26 +245,22 @@ export default Ember.Component.extend(NodeDriver, {
     this.notifyPropertyChange('config.metroCode');
   },
 
-  parseOSs(osList) {
-    return osList.filter((os) => {
-      if (OS_WHITELIST.includes(os.slug) && !isEmpty(os.provisionable_on)) {
-        return os;
-      }
+  filterOSList(osList) {
+    return filter(osList, (os) => {
+      return OS_VERIFIED.includes(os.slug) && !isEmpty(os.provisionable_on)
     });
   },
 
   parsePlans(os, plans) {
-    let out = [];
+    return filter(plans, (plan) => {
+      os.provisionable_on.forEach((loc) => {
+        let plan = plans.findBy('slug', loc);
 
-    os.provisionable_on.forEach((loc) => {
-      let plan = plans.findBy('slug', loc);
-
-      if (plan && !PLAN_BLACKLIST.includes(loc) && !out.includes(plan)) {
-        out.push(plan);
-      }
-    });
-
-    return out;
+        if (plan && !PLAN_EXCLUDE.includes(loc) && !out.includes(plan)) {
+          return true
+        }
+      })
+    })
   },
   planChoiceDetails: computed('config.plan', function () {
     let planSlug = get(this, 'config.plan');

@@ -253,6 +253,8 @@ export default Ember.Component.extend(NodeDriver, {
 
   parsePlans(os, plans) {
     return filter(plans, (plan) => {
+      return true
+      /*
       os.provisionable_on.forEach((loc) => {
         let plan = plans.findBy('slug', loc);
 
@@ -260,9 +262,10 @@ export default Ember.Component.extend(NodeDriver, {
           return true
         }
       })
+        */
     })
   },
-  planChoiceDetails: computed('config.plan', function () {
+  planChoiceDetails: computed('config.plan', 'allPlans', function () {
     let planSlug = get(this, 'config.plan');
     let plan = get(this, 'allPlans').findBy('slug', planSlug);
 
@@ -272,7 +275,6 @@ export default Ember.Component.extend(NodeDriver, {
   osObserver: on('init', observer('config.os', function () {
     this.notifyPropertyChange('config.metro');
   })),
-
   metroObserver: on('init', observer('config.metroCode', function () {
     let metros = get(this, 'metroChoices');
     let slug = get(this, 'config.metroCode');

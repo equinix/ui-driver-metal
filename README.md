@@ -4,6 +4,10 @@
 
 Rancher 2 UI driver for the [Equinix Metal](https://metal.equinix.com) IaaS platform.
 
+# Note
+With the upcoming EoL of Equinix Metal on June 30, 2026, this repo is being archived on February 28, 2026.
+
+
 This repository is [Maintained](https://github.com/packethost/standards/blob/master/maintained-statement.md) meaning that this software is supported by Equinix Metal and its community - available to use in production environments.
 
 ## Using the Equinix Metal UI Driver

@@ -36,7 +36,7 @@
     "yargs": "^16.2.0"
   },
   "dependencies": {
-    "minimist": ">=1.2.2",
+    "minimist": ">=1.2.6",
     "set-value": "^3.0.1"
   }
 }
